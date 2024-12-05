@@ -16,11 +16,13 @@ const webPort = 8080
 type Config struct {
 	Target   string
 	Template *template.Template
+	Token    string
 }
 
 func main() {
 	urlEnv := os.Getenv("DEVOPS_URL")
 	tmplEnv := os.Getenv("DEVOPS_TEMPLATE")
+	tokenEnv := os.Getenv("TOKEN")
 
 	var url string
 	flag.StringVar(&url, "target", urlEnv, "Target URL")
@@ -28,10 +30,13 @@ func main() {
 	var tmplPath string
 	flag.StringVar(&tmplPath, "template", tmplEnv, "Path to payload transformation template")
 
+	var token string
+	flag.StringVar(&token, "token", tokenEnv, "Authorization token")
+
 	flag.Parse()
 
-	if url == "" || tmplPath == "" {
-		msg := "env TARGET or -target\nenv TEMPLATE or -template"
+	if url == "" || tmplPath == "" || token == "" {
+		msg := "env TARGET or -target\nenv TEMPLATE or -template\nenv TOKEN or -token"
 		log.Panicf("Missing required flags or environment variables. See settings below:\n\n%s", msg)
 	}
 
@@ -47,6 +52,7 @@ func main() {
 	app := Config{
 		Target:   url,
 		Template: tmpl,
+		Token:    token,
 	}
 
 	srv := &http.Server{

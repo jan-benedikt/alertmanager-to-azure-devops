@@ -14,7 +14,7 @@ import (
 func (app *Config) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 
-	mux.HandleFunc("GET /", app.GetTemplate)
+	mux.HandleFunc("POST /", app.GetTemplate)
 
 	return mux
 }
