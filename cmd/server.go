@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,7 +33,11 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Print(s)
+	err = app.CreateTicket(s)
+	if err != nil {
+		log.Println(err)
+		return
+	}
 }
 
 func Decode(body io.Reader) (amt.Data, error) {
@@ -47,4 +52,29 @@ func Decode(body io.Reader) (amt.Data, error) {
 	err := decoder.Decode(&data)
 
 	return data, err
+}
+
+func (app *Config) CreateTicket(payload string) error {
+	req, err := http.NewRequest("POST", app.Target, bytes.NewReader([]byte(payload)))
+	if err != nil {
+		log.Println("Error creating request:", err)
+		return err
+	}
+
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", app.Token))
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		log.Println("Error sending POST request:", err)
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return err
+	}
+
+	return nil
 }
