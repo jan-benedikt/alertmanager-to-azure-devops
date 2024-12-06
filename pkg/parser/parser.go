@@ -19,6 +19,9 @@ func New(path string) (*template.Template, error) {
 			}
 			return strings.Join(sl[:3], separator)
 		},
+		"removePort": func(input string) string {
+			return strings.Split(input, ":")[0]
+		},
 	}
 	tmpl := template.New("template").Funcs(funcMap)
 
