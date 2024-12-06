@@ -17,18 +17,20 @@ const (
 )
 
 type Config struct {
-	Org      string
-	Project  string
-	WorkItem string
-	Template *template.Template
-	Token    string
+	Org            string
+	Project        string
+	WorkItem       string
+	CreateTemplate *template.Template
+	CloseTemplate  string
+	Token          string
 }
 
 func main() {
 	orgEnv := os.Getenv("ORGANIZATION")
 	projectEnv := os.Getenv("PROJECT")
 	workItemEnv := os.Getenv("WORKITEM")
-	tmplEnv := os.Getenv("TEMPLATE")
+	createTmplEnv := os.Getenv("CREATE_TEMPLATE")
+	closeTmplEnv := os.Getenv("CLOSE_TEMPLATE")
 	tokenEnv := os.Getenv("TOKEN")
 
 	var org string
@@ -40,30 +42,39 @@ func main() {
 	var workItem string
 	flag.StringVar(&workItem, "workitem", workItemEnv, "Azure DevOps work item name")
 
-	var tmplPath string
-	flag.StringVar(&tmplPath, "template", tmplEnv, "Path to payload transformation template")
+	var createTmplPath string
+	flag.StringVar(&createTmplPath, "create-template", createTmplEnv, "Path to payload transformation template")
+
+	var closeTmplPath string
+	flag.StringVar(&closeTmplPath, "close-template", closeTmplEnv, "Path to payload transformation template")
 
 	var token string
 	flag.StringVar(&token, "token", tokenEnv, "Authorization token")
 
 	flag.Parse()
 
-	if org == "" || project == "" || workItem == "" || tmplPath == "" || token == "" {
-		msg := "env ORG or -organization\nenv PROJECT or -project\nenv WORKITEM or -workitem\nenv TEMPLATE or -template\nenv TOKEN or -token"
+	if org == "" || project == "" || workItem == "" || createTmplPath == "" || closeTmplPath == "" || token == "" {
+		msg := "env ORG or -organization\nenv PROJECT or -project\nenv WORKITEM or -workitem\nenv CREATE_TEMPLATE or -create-template\nenv CLOSE_TEMPLATE or -close-template\nenv TOKEN or -token"
 		log.Panicf("Missing required flags or environment variables. See settings below:\n\n%s", msg)
 	}
 
-	tmpl, err := parser.New(tmplPath)
+	createTmpl, err := parser.New(createTmplPath)
+	if err != nil {
+		log.Panic(err)
+	}
+
+	closeTmpl, err := os.ReadFile(closeTmplPath)
 	if err != nil {
 		log.Panic(err)
 	}
 
 	app := Config{
-		Org:      org,
-		Project:  project,
-		WorkItem: workItem,
-		Template: tmpl,
-		Token:    token,
+		Org:            org,
+		Project:        project,
+		WorkItem:       workItem,
+		CreateTemplate: createTmpl,
+		CloseTemplate:  string(closeTmpl),
+		Token:          token,
 	}
 
 	srv := &http.Server{
@@ -71,9 +82,9 @@ func main() {
 		Handler: app.routes(),
 	}
 
-	if err := srv.ListenAndServe(); err != nil {
-		log.Panic(err)
-	}
-
 	fmt.Println("Server is running on port", webPort)
+
+	if err := srv.ListenAndServe(); err != nil {
+		log.Panic("Cannot start server:", err)
+	}
 }

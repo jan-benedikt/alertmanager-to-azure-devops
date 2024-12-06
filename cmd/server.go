@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -23,21 +22,42 @@ func (app *Config) routes() *http.ServeMux {
 func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 	data, err := Decode(r.Body)
 	if err != nil {
-		log.Println(err)
+		log.Println("Cannot decode request:", err)
 		return
 	}
 
-	s, err := parser.Render(app.Template, data)
+	s, err := parser.Render(app.CreateTemplate, data)
 	if err != nil {
-		log.Println(err)
+		log.Println("Cannot render template:", err)
 		return
 	}
 
-	err = app.CreateTicket(s)
+	ticket, err := app.GetTicket(data.Alerts[0].Fingerprint)
 	if err != nil {
-		log.Println(err)
+		log.Println("Could not get ticket:", err)
 		return
 	}
+
+	if data.Alerts[0].Status == "firing" {
+		if ticket == (Ticket{}) {
+			fmt.Println("Creating ticket for grafana alert:", data.Alerts[0].Fingerprint)
+			err = app.CreateTicket(s)
+			if err != nil {
+				log.Println("Cannot create ticket:", err)
+				return
+			}
+		}
+	} else if data.Alerts[0].Status == "resolved" {
+		if ticket != (Ticket{}) {
+			fmt.Println("Closing ticket for grafana alert:", data.Alerts[0].Fingerprint)
+			err = app.CloseTicket(ticket)
+			if err != nil {
+				log.Println("Cannot close ticket:", err)
+				return
+			}
+		}
+	}
+
 }
 
 func Decode(body io.Reader) (amt.Data, error) {
@@ -52,29 +72,4 @@ func Decode(body io.Reader) (amt.Data, error) {
 	err := decoder.Decode(&data)
 
 	return data, err
-}
-
-func (app *Config) CreateTicket(payload string) error {
-	req, err := http.NewRequest("POST", app.Target, bytes.NewReader([]byte(payload)))
-	if err != nil {
-		log.Println("Error creating request:", err)
-		return err
-	}
-
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", app.Token))
-
-	client := &http.Client{}
-	resp, err := client.Do(req)
-	if err != nil {
-		log.Println("Error sending POST request:", err)
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != 200 {
-		return err
-	}
-
-	return nil
 }
