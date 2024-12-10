@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -32,6 +33,12 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	err = app.Authenticate()
+	if err != nil {
+		log.Println("Cannot authenticate:", err)
+		return
+	}
+
 	ticket, err := app.GetTicket(data.Alerts[0].Fingerprint)
 	if err != nil {
 		log.Println("Could not get ticket:", err)
@@ -58,6 +65,45 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+}
+
+func (app *Config) Authenticate() error {
+	if app.Token != "" {
+		return nil
+	} else {
+		var token Token
+		url := fmt.Sprintf("https://login.microsoft.com/%s/oauth2/v2.0/token", app.SpTenant)
+		payload := fmt.Sprintf(`client_id="%s"
+			&scope="https://management.azure.com/.default"
+			&client_secret="%s"
+			&grant_type="client_credentials"`,
+			app.SpId, app.SpSecret)
+		req, err := http.NewRequest("POST", url, bytes.NewReader([]byte(payload)))
+		if err != nil {
+			return err
+		}
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			return err
+		}
+
+		b, _ := io.ReadAll(resp.Body)
+		fmt.Println(string(b))
+
+		decoder := json.NewDecoder(resp.Body)
+
+		err = decoder.Decode(&token)
+		if err != nil {
+			return err
+		}
+
+		app.Token = token.Token
+	}
+
+	return nil
 }
 
 func Decode(body io.Reader) (amt.Data, error) {

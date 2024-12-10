@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strings"
 	"text/template"
 
 	"github.com/lukas-blaha/alertmanager-to-azure-devops/pkg/parser"
@@ -23,15 +24,33 @@ type Config struct {
 	CreateTemplate *template.Template
 	CloseTemplate  string
 	Token          string
+	SpId           string
+	SpSecret       string
+	SpTenant       string
+	Debug          bool
+}
+
+type Token struct {
+	Token string `json:"access_token"`
 }
 
 func main() {
+	debugVar := false
+
 	orgEnv := os.Getenv("ORGANIZATION")
 	projectEnv := os.Getenv("PROJECT")
 	workItemEnv := os.Getenv("WORKITEM")
 	createTmplEnv := os.Getenv("CREATE_TEMPLATE")
 	closeTmplEnv := os.Getenv("CLOSE_TEMPLATE")
 	tokenEnv := os.Getenv("TOKEN")
+	spIdEnv := os.Getenv("SP_ID")
+	spSecretEnv := os.Getenv("SP_SECRET")
+	spTenantEnv := os.Getenv("SP_TENANT")
+	debugEnv := os.Getenv("DEBUG")
+
+	if strings.ToLower(debugEnv) == "true" {
+		debugVar = true
+	}
 
 	var org string
 	flag.StringVar(&org, "organization", orgEnv, "Azure DevOps organization name")
@@ -43,17 +62,31 @@ func main() {
 	flag.StringVar(&workItem, "workitem", workItemEnv, "Azure DevOps work item name")
 
 	var createTmplPath string
-	flag.StringVar(&createTmplPath, "create-template", createTmplEnv, "Path to payload transformation template")
+	flag.StringVar(&createTmplPath, "create-template", createTmplEnv, "Path to payload transformation template to create ticket")
 
 	var closeTmplPath string
-	flag.StringVar(&closeTmplPath, "close-template", closeTmplEnv, "Path to payload transformation template")
+	flag.StringVar(&closeTmplPath, "close-template", closeTmplEnv, "Path to payload transformation template to close ticket")
 
 	var token string
 	flag.StringVar(&token, "token", tokenEnv, "Authorization token")
 
+	var spId string
+	flag.StringVar(&spId, "sp-id", spIdEnv, "Service principal client ID")
+
+	var spSecret string
+	flag.StringVar(&spSecret, "sp-secret", spSecretEnv, "Service principal secret")
+
+	var spTenant string
+	flag.StringVar(&spTenant, "sp-tenant", spTenantEnv, "Service principal tenant ID")
+
+	var debug bool
+	flag.BoolVar(&debug, "debug", debugVar, "Enable debug mode")
+
 	flag.Parse()
 
-	if org == "" || project == "" || workItem == "" || createTmplPath == "" || closeTmplPath == "" || token == "" {
+	if token == "" || spId == "" && spSecret == "" && spTenant == "" {
+		log.Panicf("You have to provide PAT token or service principal creadentials to authenticate.")
+	} else if org == "" || project == "" || workItem == "" || createTmplPath == "" || closeTmplPath == "" {
 		msg := "env ORG or -organization\nenv PROJECT or -project\nenv WORKITEM or -workitem\nenv CREATE_TEMPLATE or -create-template\nenv CLOSE_TEMPLATE or -close-template\nenv TOKEN or -token"
 		log.Panicf("Missing required flags or environment variables. See settings below:\n\n%s", msg)
 	}
@@ -75,6 +108,10 @@ func main() {
 		CreateTemplate: createTmpl,
 		CloseTemplate:  string(closeTmpl),
 		Token:          token,
+		SpId:           spId,
+		SpSecret:       spSecret,
+		SpTenant:       spTenant,
+		Debug:          debug,
 	}
 
 	srv := &http.Server{
