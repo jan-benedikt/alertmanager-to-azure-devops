@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
+	"log"
 	"net/http"
 	"strings"
 )
@@ -66,6 +68,9 @@ func (app *Config) CreateUrl(op string) string {
 func (app *Config) MakeRequest(method, url, payload, contentType string) (*http.Response, error) {
 	req, err := http.NewRequest(method, url, bytes.NewReader([]byte(payload)))
 	if err != nil {
+		if app.Debug {
+			log.Println("Cannot create new request to:", url)
+		}
 		return nil, err
 	}
 
@@ -75,6 +80,9 @@ func (app *Config) MakeRequest(method, url, payload, contentType string) (*http.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
+		if app.Debug {
+			log.Println("Cannot make request to:", url)
+		}
 		return nil, err
 	}
 
@@ -87,6 +95,11 @@ func (app *Config) CreateTicket(payload string) error {
 
 	resp, err := app.MakeRequest("POST", url, payload, "application/json-patch+json")
 	defer resp.Body.Close()
+
+	if app.Debug {
+		b, _ := io.ReadAll(resp.Body)
+		log.Println("Response body:", string(b))
+	}
 
 	if resp.StatusCode != 200 {
 		return err
@@ -105,6 +118,9 @@ func (app *Config) GetTicket(id string) (Ticket, error) {
 
 	resp, err := app.MakeRequest("POST", url, query, "application/json")
 	if err != nil {
+		if app.Debug {
+			log.Println("Cannot make post request to get VSTS ticket.")
+		}
 		return Ticket{}, err
 	}
 	defer resp.Body.Close()
@@ -113,14 +129,23 @@ func (app *Config) GetTicket(id string) (Ticket, error) {
 
 	err = decoder.Decode(&result)
 	if err != nil {
+		if app.Debug {
+			log.Println("Cannot decode response from get VSTS ticket.")
+		}
 		return Ticket{}, err
 	}
 
 	if resp.StatusCode != 200 {
+		if app.Debug {
+			log.Println("VSTS response code: ", resp.StatusCode)
+		}
 		return Ticket{}, err
 	}
 
 	if len(result.WorkItems) == 0 {
+		if app.Debug {
+			log.Println("VSTS ticket not found.")
+		}
 		return Ticket{}, nil
 	}
 	return result.WorkItems[0], nil
