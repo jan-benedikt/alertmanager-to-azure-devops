@@ -64,20 +64,31 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-
 }
 
 func (app *Config) Authenticate() error {
-	if app.Token != "" {
+	if app.Pat != "" {
+		if app.Debug {
+			log.Println("Using PAT token authentication:", app.Token)
+		}
+
+		app.Token = app.Pat
 		return nil
 	} else {
+		if app.Debug {
+			log.Println("Using service principal authentication.")
+		}
+
 		var token Token
 		url := fmt.Sprintf("https://login.microsoft.com/%s/oauth2/v2.0/token", app.SpTenant)
-		payload := fmt.Sprintf(`client_id="%s"
-			&scope="https://management.azure.com/.default"
-			&client_secret="%s"
-			&grant_type="client_credentials"`,
-			app.SpId, app.SpSecret)
+		scope := "499b84ac-1321-427f-aa17-267ca6975798/.default"
+
+		payload := fmt.Sprintf(`client_id=%s
+					&scope=%s
+					&client_secret=%s
+					&grant_type=client_credentials`,
+			app.SpId, scope, app.SpSecret)
+
 		req, err := http.NewRequest("POST", url, bytes.NewReader([]byte(payload)))
 		if err != nil {
 			return err
@@ -89,12 +100,9 @@ func (app *Config) Authenticate() error {
 		if err != nil {
 			return err
 		}
-
-		b, _ := io.ReadAll(resp.Body)
-		fmt.Println(string(b))
+		defer resp.Body.Close()
 
 		decoder := json.NewDecoder(resp.Body)
-
 		err = decoder.Decode(&token)
 		if err != nil {
 			return err

@@ -23,6 +23,7 @@ type Config struct {
 	WorkItem       string
 	CreateTemplate *template.Template
 	CloseTemplate  string
+	Pat            string
 	Token          string
 	SpId           string
 	SpSecret       string
@@ -67,8 +68,8 @@ func main() {
 	var closeTmplPath string
 	flag.StringVar(&closeTmplPath, "close-template", closeTmplEnv, "Path to payload transformation template to close ticket")
 
-	var token string
-	flag.StringVar(&token, "token", tokenEnv, "Authorization token")
+	var pat string
+	flag.StringVar(&pat, "token", tokenEnv, "Authorization token")
 
 	var spId string
 	flag.StringVar(&spId, "sp-id", spIdEnv, "Service principal client ID")
@@ -84,8 +85,10 @@ func main() {
 
 	flag.Parse()
 
-	if token == "" || spId == "" && spSecret == "" && spTenant == "" {
-		log.Panicf("You have to provide PAT token or service principal creadentials to authenticate.")
+	if pat == "" {
+		if spId == "" || spSecret == "" || spTenant == "" {
+			log.Panicf("You have to provide PAT token or service principal creadentials to authenticate.")
+		}
 	} else if org == "" || project == "" || workItem == "" || createTmplPath == "" || closeTmplPath == "" {
 		msg := "env ORG or -organization\nenv PROJECT or -project\nenv WORKITEM or -workitem\nenv CREATE_TEMPLATE or -create-template\nenv CLOSE_TEMPLATE or -close-template\nenv TOKEN or -token"
 		log.Panicf("Missing required flags or environment variables. See settings below:\n\n%s", msg)
@@ -107,7 +110,7 @@ func main() {
 		WorkItem:       workItem,
 		CreateTemplate: createTmpl,
 		CloseTemplate:  string(closeTmpl),
-		Token:          token,
+		Pat:            pat,
 		SpId:           spId,
 		SpSecret:       spSecret,
 		SpTenant:       spTenant,
