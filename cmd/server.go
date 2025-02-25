@@ -21,7 +21,14 @@ func (app *Config) routes() *http.ServeMux {
 }
 
 func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
-	data, err := Decode(r.Body)
+	b, _ := io.ReadAll(r.Body)
+	if app.Debug {
+		log.Println("Alert body:", string(b))
+	}
+
+	rd := bytes.NewReader(b)
+
+	data, err := Decode(rd)
 	if err != nil {
 		log.Println("Cannot decode request:", err)
 		return
