@@ -34,6 +34,20 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Support for alerts without instance label (mostly from ElasticSearch datasource)
+	for i := range data.Alerts {
+		if _, ok := data.Alerts[i].Labels["instance"]; !ok {
+			if hostname_keyword, ok := data.Alerts[i].Labels["host.hostname.keyword"]; ok {
+				data.Alerts[i].Labels["instance"] = hostname_keyword
+			} else if hostname, ok := data.Alerts[i].Labels["host.hostname"]; ok {
+				data.Alerts[i].Labels["instance"] = hostname
+			} else {
+				log.Println("No instance label found in alert:", data.Alerts[i].Labels)
+				data.Alerts[i].Labels["instance"] = "unknown"
+			}
+		}
+	}
+
 	s, err := parser.Render(app.CreateTemplate, data)
 	if err != nil {
 		log.Println("Cannot render template:", err)
