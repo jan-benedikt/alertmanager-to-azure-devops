@@ -38,18 +38,19 @@ func (app *Config) CreateUrl(op string) string {
 		params  string
 		wrktItm string
 	)
-	if op == "create" {
-		urlPath = "_apis/wit/workitems/$"
-		params = "?api-version=7.1"
-		wrktItm = replaceBlanks(app.WorkItem)
-	} else if op == "get" {
-		urlPath = "_apis/wit/wiql"
-		params = "?api-version=6.0"
-		wrktItm = ""
-	} else if op == "update" {
-		urlPath = "_apis/wit/workitems/"
-		params = "?api-version=7.1"
-		wrktItm = replaceBlanks(app.WorkItem)
+	switch op {
+		case "create":
+			urlPath = "_apis/wit/workitems/$"
+			params = "?api-version=7.1"
+			wrktItm = replaceBlanks(app.WorkItem)
+		case "get":
+			urlPath = "_apis/wit/wiql"
+			params = "?api-version=6.0"
+			wrktItm = ""
+		case "update":
+			urlPath = "_apis/wit/workitems/"
+			params = "?api-version=7.1"
+			wrktItm = replaceBlanks(app.WorkItem)
 	}
 
 	url := fmt.Sprintf(
@@ -92,7 +93,7 @@ func (app *Config) MakeRequest(method, url, payload, contentType string) (*http.
 func (app *Config) CreateTicket(payload string) error {
 	// "https://dev.azure.com/<organization>/<project>/_apis/wit/workitems/<workitem>?api-version=7.1"
 	url := app.CreateUrl("create")
-
+	log.Printf("Creating ticket with payload: %s", payload)
 	resp, err := app.MakeRequest("POST", url, payload, "application/json-patch+json")
 	defer resp.Body.Close()
 
