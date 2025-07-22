@@ -137,13 +137,24 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	ticket, err = app.GetTicketByUrl(ticket.Url)
+	if err != nil {
+		log.Println("Could not get ticket by URL:", err)
+	} else {
+		if app.Debug {
+			log.Println("Ticket found by URL:", ticket)
+		}
+	}
+
 	switch data.Alerts[0].Status {
 	case "firing":
 		log.Println("Alert status is firing, checking ticket...")
 		log.Println("Ticket: ", ticket)
 		if ticket == (Ticket{}) {
 			if app.SendEnabled {
-				fmt.Println("Creating ticket for grafana alert:", data.Alerts[0].Fingerprint)
+				if app.Debug {
+					log.Println("Creating ticket for grafana alert:", data.Alerts[0].Fingerprint)
+				}
 				err = app.CreateTicket(s)
 				if err != nil {
 					log.Println("Cannot create ticket:", err)
@@ -154,7 +165,52 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
-			log.Println("Ticket already exists for this alert, skipping ticket creation.")
+			// Existing ticket found
+			if ticket.State == "Done" || ticket.State == "Removed" {
+				// Create new ticket and add comment about the old one
+				if app.SendEnabled {
+					fmt.Println("Existing ticket is Done or Removed, creating new ticket for Grafana alert:", data.Alerts[0].Fingerprint)
+					err = app.CreateTicket(s)
+					if err != nil {
+						log.Println("Cannot create ticket:", err)
+						return
+					}
+					// After creating, get the new ticket (by fingerprint)
+					newTicket, err := app.GetTicket(data.Alerts[0].Fingerprint)
+					if err != nil {
+						log.Println("Cannot get new ticket after creation:", err)
+						return
+					}
+					newTicket, err = app.GetTicketByUrl(newTicket.Url)
+					if err != nil {
+						log.Println("Cannot get new ticket by URL:", err)
+						return
+					}
+
+					ticket_url := fmt.Sprintf(
+						"https://%s.%s/%s/%s/%d",
+						replaceBlanks(app.Org),
+						"visualstudio.com",
+						replaceBlanks(app.Project),
+						"_workitems/edit",
+						ticket.Id,
+					)
+					// Add comment to new ticket about the old one
+					comment := fmt.Sprintf(`Last PBI with same alert: <a href="%s">%s</a>`, ticket_url, data.Alerts[0].Labels["alertname"])
+					if app.Debug {
+						log.Println("Adding comment to new ticket:", comment)
+					}
+					err = app.AddComment(newTicket, comment)
+					if err != nil {
+						log.Println("Cannot add comment to new ticket:", err)
+					}
+				} else {
+					log.Println("Ticket creation is disabled. Skipping ticket creation.")
+					return
+				}
+			} else {
+				log.Println("Ticket already exists for this alert, skipping ticket creation.")
+			}
 		}
 	case "resolved":
 		log.Println("Alert status is resolved, checking ticket...")
@@ -162,7 +218,7 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 		if ticket != (Ticket{}) {
 			if app.SendEnabled {
 				fmt.Println("Closing ticket for grafana alert:", data.Alerts[0].Fingerprint)
-				err = app.CloseTicket(ticket)
+				err = app.CloseTicket(ticket, data.Alerts[0])
 				if err != nil {
 					log.Println("Cannot close ticket:", err)
 					return
