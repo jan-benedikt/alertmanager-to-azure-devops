@@ -121,7 +121,9 @@ func ParseTicketFields(raw map[string]interface{}) Ticket {
 func (app *Config) CreateTicket(payload string) error {
 	// "https://dev.azure.com/<organization>/<project>/_apis/wit/workitems/<workitem>?api-version=7.1"
 	url := app.CreateUrl("create")
-	log.Printf("Creating ticket with payload: %s", payload)
+	if app.Debug {
+		log.Printf("Creating ticket with payload: %s", payload)
+	}
 	resp, err := app.MakeRequest("POST", url, payload, "application/json-patch+json")
 	defer resp.Body.Close()
 
@@ -177,7 +179,6 @@ func (app *Config) GetTicket(id string) (Ticket, error) {
 		}
 		return Ticket{}, nil
 	}
-	log.Println("Results: ", result)
 	return result.WorkItems[0], nil
 }
 

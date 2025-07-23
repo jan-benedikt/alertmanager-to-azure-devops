@@ -148,8 +148,10 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 
 	switch data.Alerts[0].Status {
 	case "firing":
-		log.Println("Alert status is firing, checking ticket...")
-		log.Println("Ticket: ", ticket)
+		if app.Debug {
+			log.Println("Alert status is firing, checking ticket...")
+			log.Println("Ticket: ", ticket)
+		}
 		if ticket == (Ticket{}) {
 			if app.SendEnabled {
 				if app.Debug {
@@ -213,8 +215,10 @@ func (app *Config) GetTemplate(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	case "resolved":
-		log.Println("Alert status is resolved, checking ticket...")
-		log.Println("Ticket: ", ticket)
+		if app.Debug {
+			log.Println("Alert status is resolved, checking ticket...")
+			log.Println("Ticket: ", ticket)
+		}
 		if ticket != (Ticket{}) {
 			if app.SendEnabled {
 				fmt.Println("Closing ticket for grafana alert:", data.Alerts[0].Fingerprint)
@@ -274,7 +278,6 @@ func (app *Config) Authenticate() error {
 		if err != nil {
 			return err
 		}
-		log.Println("Service principal authentication successful. Token:", token.Token)
 		app.Token = token.Token
 	}
 
