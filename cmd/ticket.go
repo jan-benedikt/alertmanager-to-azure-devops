@@ -132,7 +132,7 @@ func (app *Config) CreateTicket(payload string) error {
 		log.Println("Response body:", string(b))
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 203 {
 		return err
 	}
 
@@ -156,19 +156,24 @@ func (app *Config) GetTicket(id string) (Ticket, error) {
 	}
 	defer resp.Body.Close()
 
-	decoder := json.NewDecoder(resp.Body)
-
-	err = decoder.Decode(&result)
+	body, err := io.ReadAll(resp.Body)
 	if err != nil {
-		if app.Debug {
-			log.Println("Cannot decode response from get VSTS ticket.")
-		}
 		return Ticket{}, err
 	}
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 203 {
 		if app.Debug {
-			log.Println("VSTS response code: ", resp.StatusCode)
+			log.Println("VSTS response code:", resp.StatusCode)
+			log.Println("VSTS error body:", string(body))
+		}
+		return Ticket{}, fmt.Errorf("get ticket failed with status %d", resp.StatusCode)
+	}
+
+	err = json.Unmarshal(body, &result)
+	if err != nil {
+		if app.Debug {
+			log.Println("Cannot decode response from get VSTS ticket.")
+			log.Println("VSTS response body:", string(body))
 		}
 		return Ticket{}, err
 	}
@@ -265,7 +270,7 @@ func (app *Config) CloseTicket(ticket Ticket, alert amt.Alert) error {
 	resp, err := app.MakeRequest("PATCH", url, closePayload, "application/json-patch+json")
 	defer resp.Body.Close()
 
-	if resp.StatusCode != 200 {
+	if resp.StatusCode != 200 && resp.StatusCode != 203 {
 		return err
 	}
 

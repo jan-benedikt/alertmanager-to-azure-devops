@@ -150,7 +150,7 @@ func main() {
 		Handler: app.routes(),
 	}
 
-	fmt.Println("Server version 0.2.2")
+	fmt.Println("Server version 0.2.3")
 	fmt.Println("Server is running on port", webPort)
 
 	if err := srv.ListenAndServe(); err != nil {
